@@ -731,14 +731,19 @@ function previewHtml(d){
   const p = d.preview || {};
   let inner = "";
   if (p.type === "pdf"){
-    const local = state.files.find(f => f.file_index === d.file_index && /\.pdf$/i.test(f.file.name));
-    if (local){
-      const url = URL.createObjectURL(local.file);
-      inner = `<iframe src="${url}" title="Original PDF"></iframe>`;
-    } else if (p.text){
-      inner = `<pre class="previewtext">${esc(p.text)}</pre><div class="note">Original PDF unavailable after a refresh — showing OCR text instead.</div>`;
+    // Preferred: original PDF persisted server-side (n8n v7.2) — survives refreshes.
+    if (p.data_url){
+      inner = `<iframe src="${esc(p.data_url)}" title="Original PDF"></iframe>`;
     } else {
-      inner = `<div class="note">No PDF preview available.</div>`;
+      const local = state.files.find(f => f.file_index === d.file_index && /\.pdf$/i.test(f.file.name));
+      if (local){
+        const url = URL.createObjectURL(local.file);
+        inner = `<iframe src="${url}" title="Original PDF"></iframe>`;
+      } else if (p.text){
+        inner = `<pre class="previewtext">${esc(p.text)}</pre><div class="note">Original PDF unavailable — showing OCR text instead.</div>`;
+      } else {
+        inner = `<div class="note">No PDF preview available.</div>`;
+      }
     }
   } else if (p.type === "table" && Array.isArray(p.rows)){
     const cols = p.columns || [];
