@@ -706,6 +706,13 @@ function renderReview(d){
     const target = group === "classification" ? state.classification : state.extraction;
     input.addEventListener("input", () => {
       const v = input.value;
+      if (group === "classification" && key === "confidence"){
+        // Accept "95%", "95", "0.95" → store 0.95 (data stays 0-1 for n8n thresholds)
+        const cleaned = String(v).trim().replace(/%$/, "");
+        const n = Number(cleaned);
+        target[key] = (v === "" ? null : (isFinite(n) ? (n > 1 ? n / 100 : n) : v));
+        return;
+      }
       target[key] = (v === "" ? null : (isNumericStr(v) ? Number(v) : v));
     });
   });
@@ -772,8 +779,14 @@ function fieldsHtml(){
     if (!keys.length) return `<div class="panel card" style="box-shadow:none"><h2>${title}</h2><div class="muted">No data</div></div>`;
     const fields = keys.map(k => {
       const v = obj[k];
-      const shown = v === null || v === undefined ? "" : v;
-      return `<div class="field"><label>${esc(humanize(k))}</label><input data-field="placeholder" value="${esc(shown)}" placeholder="null"></div>`;
+      // Confidence input: show as percentage (e.g. 100%) but keep the underlying
+      // value as 0-1 — the input listener converts back before submit.
+      const isConf = title === "Classification" && k === "confidence";
+      const shown = isConf
+        ? (v === null || v === undefined ? "" : Math.round(Number(v) * 100) + "%")
+        : (v === null || v === undefined ? "" : v);
+      const placeholder = isConf ? "null (0-100%)" : "null";
+      return `<div class="field"><label>${esc(humanize(k))}</label><input data-field="placeholder" value="${esc(shown)}" placeholder="${placeholder}"></div>`;
     }).join("");
     return `<div class="panel card" style="box-shadow:none"><h2>${title}</h2><div class="fields" data-group="${title === "Classification" ? "classification" : "extraction"}">${fields}</div></div>`;
   };
