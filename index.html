@@ -408,22 +408,18 @@ function renderReview(d){
   html.push(`<div class="outcome">
     <h3>Outcome</h3>
     <div class="btns">
-      <button class="btn btn-approve" id="outApprove">✓ Approve as verified</button>
-      <button class="btn btn-reject" id="outReject">✕ Reject document</button>
+      <button type="button" class="btn btn-approve" id="outApprove">✓ Approve as verified</button>
+      <button type="button" class="btn btn-reject" id="outReject">✕ Reject document</button>
     </div>
     <div class="field" style="margin-top:12px">
       <label for="notes">Notes${state.outcome === "rejected" ? " (required)" : " (optional)"}</label>
       <textarea id="notes" rows="2" placeholder="Reason for decision…">${esc(state.notes)}</textarea>
     </div>
-    <div style="margin-top:14px"><button class="btn btn-primary" id="submitReview">Submit decision</button> <span class="muted" id="reviewMsg"></span></div>
+    <div style="margin-top:14px"><button type="button" class="btn btn-primary" id="submitReview">Submit decision</button> <span class="muted" id="reviewMsg"></span></div>
   </div>`);
   $("reviewBody").innerHTML = html.join("");
 
-  $("outApprove").addEventListener("click", () => { state.outcome = "approved"; markActive(); });
-  $("outReject").addEventListener("click", () => { state.outcome = "rejected"; markActive(); });
-  $("notes").addEventListener("input", e => { state.notes = e.target.value; updateNotesLabel(); });
-  $("submitReview").addEventListener("click", submitReview);
-  // bind field inputs
+  // field input bindings (inputs are rebuilt each render)
   document.querySelectorAll("[data-field]").forEach(input => {
     const [group, key] = input.dataset.field.split("::");
     const target = group === "classification" ? state.classification : state.extraction;
@@ -433,10 +429,24 @@ function renderReview(d){
     });
   });
 }
+// Review buttons + notes are bound ONCE at the document level via delegation,
+// so they keep working even if #reviewBody is re-rendered.
+document.addEventListener("click", (e) => {
+  const t = e.target && e.target.closest ? e.target.closest("button") : null;
+  if (!t || !t.closest("#reviewBody")) return;
+  if (t.id === "outApprove") { state.outcome = "approved"; markActive(); }
+  else if (t.id === "outReject") { state.outcome = "rejected"; markActive(); }
+  else if (t.id === "submitReview") submitReview();
+});
+document.addEventListener("input", (e) => {
+  if (e.target && e.target.id === "notes"){ state.notes = e.target.value; updateNotesLabel(); }
+});
 function isNumericStr(v){ return v !== "" && !isNaN(Number(v)) && /^-?\d+(\.\d+)?$/.test(String(v).trim()); }
 function markActive(){
-  $("outApprove").classList.toggle("active", state.outcome === "approved");
-  $("outReject").classList.toggle("active", state.outcome === "rejected");
+  const a = $("outApprove"), r = $("outReject"), s = $("submitReview");
+  if (a) a.classList.toggle("active", state.outcome === "approved");
+  if (r) r.classList.toggle("active", state.outcome === "rejected");
+  if (s) s.textContent = state.outcome ? `Submit decision (${state.outcome})` : "Submit decision";
   updateNotesLabel();
 }
 function updateNotesLabel(){
