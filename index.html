@@ -432,6 +432,12 @@ function fmtMoney(v, cur){
   if (abs >= 1e3) return sign + curS + (abs/1e3).toFixed(1).replace(/\.0$/,"") + "k";
   return sign + curS + abs.toLocaleString();
 }
+// Confidence 0~1 → percentage for display (data stays 0~1; thresholds in n8n unchanged)
+function fmtConf(v){
+  const n = Number(v);
+  if (!isFinite(n) || n === 0) return "—";
+  return Math.round(n * 100) + "%";
+}
 function chip(status){
   const map = {pending:"pending",approved:"approved",rejected:"rejected",processing:"processing",review_ready:"review_ready",complete:"complete"};
   const cls = map[status] || "pending";
@@ -586,7 +592,7 @@ function renderStatus(d){
     tr.innerHTML = `<td>${(r.file_index ?? 0) + 1}</td>
       <td>${esc(r.file_name)}</td>
       <td>${esc(r.document_type || "—")}</td>
-      <td>${r.confidence ? r.confidence.toFixed(2) : "—"}</td>
+      <td>${fmtConf(r.confidence)}</td>
       <td>${r.warning_count || 0}</td>
       <td>${chip(r.status)}</td>`;
     tbody.appendChild(tr);
@@ -943,7 +949,7 @@ function renderEntities(st, docs){
       <div class="entity-foot">
         <div><div class="mini-label">Period</div><div class="mini-value">${esc(e.period_from||"—")} → ${esc(e.period_to||"—")}</div></div>
         <div><div class="mini-label">Account</div><div class="mini-value">${esc(e.account||c.account||"—")}</div></div>
-        <div><div class="mini-label">AI confidence</div><div class="mini-value">${Number(c.confidence||0).toFixed(2)}</div></div>
+        <div><div class="mini-label">AI confidence</div><div class="mini-value">${fmtConf(c.confidence)}</div></div>
       </div>`;
     wrap.appendChild(card);
     shown++;
@@ -1034,7 +1040,7 @@ function renderEvidence(st, docs){
       fields: [
         ["Source file", cr.file_name],
         ["Decision", cr.status],
-        ["Confidence", Number(c.confidence||0).toFixed(2)],
+        ["Confidence", fmtConf(c.confidence)],
         ["Statement link", sameAccount ? "Same account in batch statement" : "No match"]
       ]
     });
@@ -1067,7 +1073,7 @@ function renderEvidence(st, docs){
       fields: [
         ["Source file", tx.file_name],
         ["Decision", tx.status],
-        ["Confidence", Number(c.confidence||0).toFixed(2)],
+        ["Confidence", fmtConf(c.confidence)],
         ["Statement link", sameAccount ? "Same account in batch statement" : "No match"]
       ]
     });
@@ -1096,7 +1102,7 @@ function renderEvidence(st, docs){
         ["Payment date", esc(e.payment_date || "—")],
         ["Source file", py.file_name],
         ["Decision", py.status],
-        ["Confidence", Number(c.confidence||0).toFixed(2)]
+        ["Confidence", fmtConf(c.confidence)]
       ]
     });
   }
@@ -1116,7 +1122,7 @@ function renderEvidence(st, docs){
         treatment: d.status === "rejected" ? "Rejected — excluded from totals" : "Human-confirmed; retained",
         summary: (d.human_review?.notes ? "Reviewer notes: " + d.human_review.notes + " " : "") + "The scan was readable after human review. It is retained as evidence and excluded from cash totals unless approved.",
         signals: [
-          ["AI confidence", conf.toFixed(2)],
+          ["AI confidence", fmtConf(conf)],
           ["AI guess", esc(c.ai_guess?.type || c.document_type || "—")],
           ["Decision", d.status],
           ["Notes", esc(d.human_review?.notes || "—")]
