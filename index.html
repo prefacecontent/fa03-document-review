@@ -253,6 +253,14 @@
 
   <!-- ============ UPLOAD VIEW ============ -->
   <section id="view-upload">
+    <div class="panel card" id="resumeCard" style="display:none;margin-bottom:16px;border:1px solid var(--blue);background:var(--blue-soft)">
+      <h2 style="margin-bottom:8px">↩ Resume previous batch</h2>
+      <p class="muted" style="margin:0 0 12px">Found an unfinished batch: <strong id="resumeBatchId"></strong> · started <span id="resumeBatchTime"></span>. You can continue where you left off without re-uploading.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="resumeBtn">Continue where you left off</button>
+        <button class="btn" id="discardResumeBtn">Start fresh (discard saved batch)</button>
+      </div>
+    </div>
     <div class="panel card">
       <h2>Upload documents</h2>
       <div class="dropzone" id="dropzone">
@@ -505,6 +513,7 @@ $("uploadBtn").addEventListener("click", async () => {
   try {
     const data = await api("/fa03/intake", { method: "POST", body: fd });
     state.batchId = data.batch_id || batchId;
+    saveLastBatch(state.batchId);
     state.files = state.files.map((f, i) => Object.assign(f, { file_index: i }));
     startStatusPolling();
   } catch (e) {
@@ -601,6 +610,38 @@ function resetAll(){
   setPill("Ready", "");
   show("upload");
 }
+
+// ---- resume last batch (refresh-safe) ----
+const LS_KEY = "fa03_last_batch";
+function saveLastBatch(batchId){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ batch_id: batchId, saved_at: Date.now() })); } catch(e){}
+}
+function clearLastBatch(){
+  try { localStorage.removeItem(LS_KEY); } catch(e){}
+}
+function readLastBatch(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch(e){ return null; }
+}
+function showResumeCard(){
+  const saved = readLastBatch();
+  const card = $("resumeCard");
+  if (!saved || !saved.batch_id || !card) return;
+  $("resumeBatchId").textContent = saved.batch_id;
+  $("resumeBatchTime").textContent = new Date(saved.saved_at).toLocaleString();
+  card.style.display = "block";
+}
+$("resumeBtn").addEventListener("click", () => {
+  const saved = readLastBatch();
+  if (!saved || !saved.batch_id) return;
+  state.batchId = saved.batch_id;
+  startStatusPolling();
+});
+$("discardResumeBtn").addEventListener("click", () => {
+  clearLastBatch();
+  $("resumeCard").style.display = "none";
+});
+// show resume card on load if a batch was saved
+showResumeCard();
 
 // ================= REVIEW =================
 async function startReview(){
