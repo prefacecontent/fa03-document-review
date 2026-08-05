@@ -196,6 +196,7 @@ const state = {
   batchId: null,
   files: [],            // {file, file_index, document_id}
   polling: null,
+  pollStart: null,      // timestamp of first poll (for processing timeout)
   reviewQueue: [],      // document_ids
   currentDoc: null,
   classification: {},
@@ -294,6 +295,8 @@ function startStatusPolling(){
   show("view-status");
   $("batchIdLabel").textContent = state.batchId;
   $("statusText").textContent = "Waiting for AI to read the documents…";
+  state.pollStart = Date.now();
+  $("statusSpinner").classList.remove("hidden");
   pollStatus();
   state.polling = setInterval(pollStatus, 2500);
 }
@@ -304,6 +307,7 @@ async function pollStatus(){
     if (d.status === "review_ready" || d.status === "complete"){
       clearInterval(state.polling);
       state.polling = null;
+      $("statusSpinner").classList.add("hidden");
       if (d.next_document_id){
         $("startReviewBtn").disabled = false;
         $("statusText").innerHTML = "All documents processed by AI — ready for human review.";
@@ -312,7 +316,23 @@ async function pollStatus(){
       }
     }
   } catch (e) {
-    $("statusText").textContent = "Polling error: " + e.message;
+    const msg = String(e.message || "");
+    if (/not found/i.test(msg)){
+      // n8n only persists the batch when the intake execution finishes,
+      // so "Batch not found" during the first few minutes just means processing.
+      const elapsed = state.pollStart ? ((Date.now() - state.pollStart) / 1000) : 0;
+      if (elapsed > 240){
+        clearInterval(state.polling);
+        state.polling = null;
+        $("statusSpinner").classList.add("hidden");
+        $("statusText").innerHTML = `<span class="err">The batch did not appear after 4 minutes — the intake execution may have failed. Check the n8n executions log.</span>`;
+      } else {
+        $("statusText").textContent = "AI is reading the documents — this takes about 1–2 minutes…";
+        $("statusSpinner").classList.remove("hidden");
+      }
+    } else {
+      $("statusText").textContent = "Polling error: " + e.message;
+    }
   }
 }
 function renderStatus(d){
@@ -345,6 +365,7 @@ function resetAll(){
   if (state.polling) clearInterval(state.polling);
   state.batchId = null; state.files = []; state.reviewQueue = [];
   state.currentDoc = null; state.outcome = null; state.notes = "";
+  state.pollStart = null;
   $("uploadStatus").textContent = ""; $("fileList").innerHTML = "";
   $("uploadBtn").disabled = true;
   show("view-upload");
